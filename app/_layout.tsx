@@ -1,25 +1,38 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+// ─── Sankofa SDK Initialization ───────────────────────────────────────────────
+// Initialize once at the root layout, before any screen renders.
+// In production replace 'YOUR_API_KEY' with your real key from sankofa.dev.
+//
+// NOTE: The native module is only available in dev builds (expo run:ios / expo run:android).
+// It will throw in Expo Go — use a development build for this example.
+try {
+  const { Sankofa } = require('sankofa-react-native');
+  Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
+    endpoint: 'http://172.20.10.6:8080',   // ← point to your local Sankofa server
+    debug: true,
+    recordSessions: true,
+    maskAllInputs: true,
+    trackLifecycleEvents: true,
+  });
+} catch (e) {
+  console.warn('[Sankofa] Native module not available (running in Expo Go?)', e);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -27,7 +40,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -38,19 +50,11 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  if (!loaded) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={DarkTheme}>
+      <Stack screenOptions={{ headerStyle: { backgroundColor: '#0F0F14' }, headerTintColor: '#fff' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
