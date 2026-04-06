@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "dev.sankofa.rn.example"
+      "bundleIdentifier": "dev.sankofa.rn.example",
+      "appleTeamId": "2V4848U2LJ"
     },
     "android": {
       "package": "dev.sankofa.rn.example",
