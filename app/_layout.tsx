@@ -23,7 +23,7 @@ SplashScreen.preventAutoHideAsync();
 try {
   const { Sankofa } = require('sankofa-react-native');
   Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
-    endpoint: 'http://172.20.10.6:8080',   // ← point to your local Sankofa server
+    endpoint: 'http://192.168.1.241:8080',   // ← point to your local Sankofa server
     debug: true,
     recordSessions: true,
     maskAllInputs: true,
