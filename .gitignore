@@ -84,6 +84,7 @@ yarn-error.*
 .env*.local
 
 # ─── Build artifacts ────────────────────────────────────────────────────────
+build/
 *.app
 *.ipa
 *.apk

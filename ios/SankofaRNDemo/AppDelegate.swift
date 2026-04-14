@@ -1,6 +1,7 @@
 import Expo
 import React
 import ReactAppDependencyProvider
+import SankofaReactNative
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -52,6 +53,19 @@ public class AppDelegate: ExpoAppDelegate {
   }
 }
 
+private func sankofaDeployBundleURL() -> URL? {
+  let selector = NSSelectorFromString("bundleURL")
+  for className in ["SankofaDeployBundleProvider", "SankofaReactNative.SankofaDeployBundleProvider"] {
+    guard let provider = NSClassFromString(className) as? NSObject.Type,
+          provider.responds(to: selector),
+          let value = provider.perform(selector)?.takeUnretainedValue() as? URL else {
+      continue
+    }
+    return value
+  }
+  return nil
+}
+
 class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   // Extension point for config-plugins
 
@@ -64,6 +78,9 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 #if DEBUG
     return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
+    if let url = sankofaDeployBundleURL() {
+      return url
+    }
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
