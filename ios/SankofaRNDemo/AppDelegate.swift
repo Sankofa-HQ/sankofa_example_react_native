@@ -70,8 +70,13 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   // Extension point for config-plugins
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
-    // needed to return the correct URL for expo-dev-client.
-    bridge.bundleURL ?? bundleURL()
+    // Always re-resolve via bundleURL() so OTA bundle-path changes picked
+    // up by SankofaDeploy are respected on bridge reload. Previously this
+    // returned `bridge.bundleURL` first (cached at bridge init), which
+    // caused the bridge to reload the OLD embedded bundle even after the
+    // SDK had pointed `sankofa_deploy_bundle_path` at a new OTA bundle —
+    // the user had to cold-launch twice before the patch actually applied.
+    bundleURL()
   }
 
   override func bundleURL() -> URL? {

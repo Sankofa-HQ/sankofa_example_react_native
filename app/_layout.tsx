@@ -7,7 +7,25 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
 
-export { ErrorBoundary } from 'expo-router';
+import { ErrorBoundary as ExpoErrorBoundary, ErrorBoundaryProps } from 'expo-router';
+
+// Custom ErrorBoundary that tells SankofaDeploy a fatal JS error happened
+// before rendering Expo Router's default error screen. SankofaDeploy will
+// report `crash_on_update` to the server and roll back to the previous
+// bundle if the current one is an OTA update.
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  try {
+    const { SankofaDeploy } = require('sankofa-react-native');
+    const anyGlobal = globalThis as any;
+    const deploy = anyGlobal.__sankofaDeployInstance as { reportError?: (e: unknown) => void } | undefined;
+    if (deploy?.reportError) {
+      deploy.reportError(props.error);
+    } else if (typeof SankofaDeploy?.reportError === 'function') {
+      SankofaDeploy.reportError(props.error);
+    }
+  } catch {}
+  return <ExpoErrorBoundary {...props} />;
+}
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -33,13 +51,24 @@ export default function RootLayout() {
   const [updateState, setUpdateState] = useState<UpdateUIState>({ kind: 'idle' });
   const deployRef = useRef<any>(null);
 
+  // Font load failures are non-fatal. After an OTA update, Metro's asset
+  // entries for a font can drift from what's physically in the .app, making
+  // `expo-font.loadAsync` fail with CTFontManagerError 101. Crashing the
+  // entire app over a cosmetic font is the wrong trade-off — fall back to
+  // the system font, report the failure, and keep rendering.
   useEffect(() => {
-    if (error) throw error;
+    if (error) {
+      console.warn('[App] Font load failed, falling back to system font:', error);
+      try {
+        const deploy = (globalThis as any).__sankofaDeployInstance;
+        deploy?.reportError?.(error, { fatal: false });
+      } catch {}
+    }
   }, [error]);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+    if (loaded || error) SplashScreen.hideAsync();
+  }, [loaded, error]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +85,7 @@ export default function RootLayout() {
 
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;
+      (globalThis as any).__sankofaDeployInstance = deploy;
 
       setUpdateState({ kind: 'checking' });
 
@@ -111,7 +141,9 @@ export default function RootLayout() {
     };
   }, []);
 
-  if (!loaded) return null;
+  // Wait for either a successful font load OR a load failure — don't block
+  // the UI forever if the font can't register.
+  if (!loaded && !error) return null;
 
   return (
     <ThemeProvider value={DarkTheme}>
@@ -119,7 +151,24 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
-      <UpdateModal state={updateState} onDismiss={() => setUpdateState({ kind: 'idle' })} />
+      <UpdateModal
+        state={updateState}
+        onDismiss={() => setUpdateState({ kind: 'idle' })}
+        onRestartNow={async () => {
+          const deploy = deployRef.current;
+          if (!deploy) return;
+          try {
+            await deploy.applyPending();
+            // applyPending triggers a reload; if the reload didn't take,
+            // we fall back to showing a "restart required" state.
+          } catch (err: any) {
+            setUpdateState({
+              kind: 'failed',
+              message: err?.message || 'restart failed',
+            });
+          }
+        }}
+      />
       <UpdateDebugBanner state={updateState} />
     </ThemeProvider>
   );
@@ -146,10 +195,19 @@ async function applyUpdate(
   }
 }
 
-function UpdateModal({ state, onDismiss }: { state: UpdateUIState; onDismiss: () => void }) {
+function UpdateModal({
+  state,
+  onDismiss,
+  onRestartNow,
+}: {
+  state: UpdateUIState;
+  onDismiss: () => void;
+  onRestartNow: () => void | Promise<void>;
+}) {
   const visible =
     (state.kind === 'available' && state.isMandatory) ||
     (state.kind === 'downloading' && state.isMandatory) ||
+    state.kind === 'applied' ||
     state.kind === 'failed';
 
   if (!visible) return null;
@@ -171,6 +229,21 @@ function UpdateModal({ state, onDismiss }: { state: UpdateUIState; onDismiss: ()
               <Text style={styles.title}>Updating…</Text>
               <Text style={styles.body}>Downloading {state.label}. The app will reload automatically.</Text>
               <ActivityIndicator style={{ marginTop: 12 }} />
+            </>
+          )}
+          {state.kind === 'applied' && (
+            <>
+              <Text style={styles.title}>Update ready</Text>
+              <Text style={styles.body}>
+                {state.label} has been downloaded. Restart the app to apply it now, or dismiss to
+                apply on the next launch.
+              </Text>
+              <Pressable style={styles.primaryButton} onPress={() => void onRestartNow()}>
+                <Text style={styles.primaryButtonText}>Restart now</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryButton} onPress={onDismiss}>
+                <Text style={styles.secondaryButtonText}>Later</Text>
+              </Pressable>
             </>
           )}
           {state.kind === 'failed' && (
@@ -197,8 +270,16 @@ function UpdateDebugBanner({ state }: { state: UpdateUIState }) {
     switch (state.kind) {
       case 'checking':
         return 'Checking for updates…';
-      case 'no_update':
-        return `Up to date${state.reason ? ` (${state.reason})` : ''}`;
+      case 'no_update': {
+        const r = state.reason || '';
+        const isError =
+          r.startsWith('check_') ||
+          r.startsWith('handshake_') ||
+          r.startsWith('exception') ||
+          r.includes('network_error');
+        if (!r) return 'Up to date';
+        return isError ? `Update check failed: ${r}` : `Up to date (${r})`;
+      }
       case 'available':
         return `Update available: ${state.label}${state.isMandatory ? ' (mandatory)' : ' (optional)'}`;
       case 'downloading':
@@ -241,6 +322,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: '#1A1A21', fontSize: 15, fontWeight: '700' },
+  secondaryButton: {
+    marginTop: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  secondaryButtonText: { color: '#C9C9D4', fontSize: 14, fontWeight: '600' },
   banner: {
     position: 'absolute',
     bottom: 90,

@@ -42,12 +42,12 @@ const QUICK_EVENTS: QuickEvent[] = [
   { label: 'CTA Clicked',     event: 'cta_clicked',      emoji: '🚀' },
   { label: 'Add to Cart',     event: 'add_to_cart',      emoji: '🛒', properties: { item_id: 'SKU-001', price: 29.99 } },
   { label: 'View Product',    event: 'product_viewed',   emoji: '👀', properties: { product: 'Sankofa Pro' } },
-  { label: 'Checkout Start',  event: 'checkout_started', emoji: '💳' },
-  { label: 'Pay Clicked',     event: 'pay_clicked',      emoji: '💰', properties: { amount: 99.00, currency: 'USD' } },
-  { label: 'Share',           event: 'share_clicked',    emoji: '📤', properties: { platform: 'Twitter' } },
-  { label: 'Checkout Start2',  event: 'checkout_started-2', emoji: '💳' },
-  { label: 'Pay Clicked2',     event: 'pay_clicked-2',      emoji: '💰', properties: { amount2: 199.00, currency2: 'GHS' } },
-  { label: 'Share2',           event: 'share_clicked-2',    emoji: '📤', properties: { platform: 'WhatsApp' } },
+  // { label: 'Checkout Start',  event: 'checkout_started', emoji: '💳' },
+  // { label: 'Pay Clicked',     event: 'pay_clicked',      emoji: '💰', properties: { amount: 99.00, currency: 'USD' } },
+  // { label: 'Share',           event: 'share_clicked',    emoji: '📤', properties: { platform: 'Twitter' } },
+  // { label: 'Checkout Start2',  event: 'checkout_started-2', emoji: '💳' },
+  // { label: 'Pay Clicked2',     event: 'pay_clicked-2',      emoji: '💰', properties: { amount2: 199.00, currency2: 'GHS' } },
+  // { label: 'Share2',           event: 'share_clicked-2',    emoji: '📤', properties: { platform: 'WhatsApp' } },
 ];
 
 function makeId() {
