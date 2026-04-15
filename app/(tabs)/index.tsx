@@ -40,8 +40,8 @@ interface QuickEvent {
 
 const QUICK_EVENTS: QuickEvent[] = [
   { label: 'CTA Clicked',     event: 'cta_clicked',      emoji: '🚀' },
-  { label: 'Add to Cart',     event: 'add_to_cart',      emoji: '🛒', properties: { item_id: 'SKU-001', price: 29.99 } },
-  { label: 'View Product',    event: 'product_viewed',   emoji: '👀', properties: { product: 'Sankofa Pro' } },
+  // { label: 'Add to Cart',     event: 'add_to_cart',      emoji: '🛒', properties: { item_id: 'SKU-001', price: 29.99 } },
+  // { label: 'View Product',    event: 'product_viewed',   emoji: '👀', properties: { product: 'Sankofa Pro' } },
   // { label: 'Checkout Start',  event: 'checkout_started', emoji: '💳' },
   // { label: 'Pay Clicked',     event: 'pay_clicked',      emoji: '💰', properties: { amount: 99.00, currency: 'USD' } },
   // { label: 'Share',           event: 'share_clicked',    emoji: '📤', properties: { platform: 'Twitter' } },

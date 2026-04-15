@@ -76,7 +76,7 @@ export default function RootLayout() {
       const { Sankofa, SankofaDeploy } = require('sankofa-react-native');
 
       Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
-        endpoint: 'http://192.168.1.241:8080',
+        endpoint: 'http://192.168.1.81:8080',
         debug: true,
         recordSessions: true,
         maskAllInputs: true,
@@ -86,6 +86,12 @@ export default function RootLayout() {
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;
       (globalThis as any).__sankofaDeployInstance = deploy;
+
+      // Tell the SDK this boot is healthy as soon as React mounts the root
+      // layout. Without this the SDK's rollback heuristic counts any
+      // sub-10-second session as a "crash" (two of those in a row triggers
+      // a false-positive rollback).
+      deploy.notifyAppReady?.();
 
       setUpdateState({ kind: 'checking' });
 
@@ -106,24 +112,10 @@ export default function RootLayout() {
             size: update.size,
           });
 
+          // Mandatory → download and apply without asking. Optional → wait
+          // for the user to press "Download" in the modal.
           if (update.isMandatory) {
             await applyUpdate(deploy, update, setUpdateState, cancelled);
-          } else {
-            setUpdateState({
-              kind: 'downloading',
-              label: update.label,
-              isMandatory: false,
-            });
-            try {
-              await deploy.downloadInBackground(update);
-              if (!cancelled) {
-                setUpdateState({ kind: 'applied', label: update.label });
-              }
-            } catch (err: any) {
-              if (!cancelled) {
-                setUpdateState({ kind: 'failed', label: update.label, message: err?.message || 'download failed' });
-              }
-            }
           }
         })
         .catch((err: any) => {
@@ -154,13 +146,46 @@ export default function RootLayout() {
       <UpdateModal
         state={updateState}
         onDismiss={() => setUpdateState({ kind: 'idle' })}
+        onDownloadNow={async () => {
+          const deploy = deployRef.current;
+          if (!deploy || updateState.kind !== 'available') return;
+          const update = {
+            updateAvailable: true,
+            label: updateState.label,
+            isMandatory: updateState.isMandatory,
+            size: updateState.size,
+            // The SDK will pull the full update object from its own cache;
+            // the modal only holds the display-level fields.
+          } as any;
+          setUpdateState({ kind: 'downloading', label: updateState.label, isMandatory: false });
+          try {
+            // Re-issue checkForUpdate to get fresh URL + sha, then download.
+            const fresh = await deploy.checkForUpdate();
+            if (fresh?.updateAvailable) {
+              await deploy.downloadInBackground(fresh);
+              setUpdateState({ kind: 'applied', label: fresh.label || update.label });
+            } else {
+              setUpdateState({ kind: 'no_update', reason: fresh?.reason });
+            }
+          } catch (err: any) {
+            setUpdateState({
+              kind: 'failed',
+              label: update.label,
+              message: err?.message || 'download failed',
+            });
+          }
+        }}
         onRestartNow={async () => {
           const deploy = deployRef.current;
           if (!deploy) return;
           try {
-            await deploy.applyPending();
-            // applyPending triggers a reload; if the reload didn't take,
-            // we fall back to showing a "restart required" state.
+            const applied = await deploy.applyPending();
+            if (!applied) {
+              setUpdateState({
+                kind: 'failed',
+                message: 'No pending update to apply',
+              });
+            }
           } catch (err: any) {
             setUpdateState({
               kind: 'failed',
@@ -195,18 +220,26 @@ async function applyUpdate(
   }
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function UpdateModal({
   state,
   onDismiss,
+  onDownloadNow,
   onRestartNow,
 }: {
   state: UpdateUIState;
   onDismiss: () => void;
+  onDownloadNow: () => void | Promise<void>;
   onRestartNow: () => void | Promise<void>;
 }) {
   const visible =
-    (state.kind === 'available' && state.isMandatory) ||
-    (state.kind === 'downloading' && state.isMandatory) ||
+    state.kind === 'available' ||
+    state.kind === 'downloading' ||
     state.kind === 'applied' ||
     state.kind === 'failed';
 
@@ -224,10 +257,30 @@ function UpdateModal({
               </Text>
             </>
           )}
-          {state.kind === 'downloading' && state.isMandatory && (
+          {state.kind === 'available' && !state.isMandatory && (
             <>
-              <Text style={styles.title}>Updating…</Text>
-              <Text style={styles.body}>Downloading {state.label}. The app will reload automatically.</Text>
+              <Text style={styles.title}>Update available</Text>
+              <Text style={styles.body}>
+                {state.label} is ready to download
+                {typeof state.size === 'number' ? ` (${formatSize(state.size)})` : ''}. Download now to apply
+                it on the next app launch, or tap Later to stay on the current version.
+              </Text>
+              <Pressable style={styles.primaryButton} onPress={() => void onDownloadNow()}>
+                <Text style={styles.primaryButtonText}>Download</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryButton} onPress={onDismiss}>
+                <Text style={styles.secondaryButtonText}>Later</Text>
+              </Pressable>
+            </>
+          )}
+          {state.kind === 'downloading' && (
+            <>
+              <Text style={styles.title}>{state.isMandatory ? 'Updating…' : 'Downloading update…'}</Text>
+              <Text style={styles.body}>
+                {state.isMandatory
+                  ? `Downloading ${state.label}. The app will reload automatically.`
+                  : `Downloading ${state.label}. We'll let you know when it's ready.`}
+              </Text>
               <ActivityIndicator style={{ marginTop: 12 }} />
             </>
           )}
