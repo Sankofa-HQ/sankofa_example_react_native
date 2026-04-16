@@ -76,7 +76,7 @@ export default function RootLayout() {
       const { Sankofa, SankofaDeploy } = require('sankofa-react-native');
 
       Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
-        endpoint: 'http://192.168.1.81:8080',
+        endpoint: 'http://192.168.1.81:8080', //'http://192.168.1.81:8080',
         debug: true,
         recordSessions: true,
         maskAllInputs: true,
