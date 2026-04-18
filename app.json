@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sankofa RN Demo",
     "slug": "sankofa-rn-demo",
-    "version": "1.0.6",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sankofa",
@@ -33,7 +33,15 @@
     },
     "plugins": [
       "expo-router",
-      "sankofa-react-native"
+      "sankofa-react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
