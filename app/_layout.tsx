@@ -73,7 +73,9 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     try {
-      const { Sankofa, SankofaDeploy } = require('sankofa-react-native');
+      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig } = require('sankofa-react-native');
+      const { setSankofaSwitch, setSankofaConfig } = require('@/lib/sankofaClient');
+      const { DEMO_FLAG_DEFAULTS, DEMO_CONFIG_DEFAULTS } = require('@/lib/sankofaDemo');
 
       Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
         endpoint: 'http://192.168.1.241:8080', //'http://192.168.1.81:8080',
@@ -82,6 +84,16 @@ export default function RootLayout() {
         maskAllInputs: true,
         trackLifecycleEvents: true,
       });
+
+      // Switch + Config — constructed AFTER initialize so they land in
+      // the Module Registry as "core-initialized" and the handshake
+      // routes flags/values straight into them. Bundled defaults keep
+      // getFlag/get working before the first handshake completes (e.g.
+      // offline first-launch).
+      const switches = new SankofaSwitch({ defaults: DEMO_FLAG_DEFAULTS });
+      const config = new SankofaConfig({ defaults: DEMO_CONFIG_DEFAULTS });
+      setSankofaSwitch(switches);
+      setSankofaConfig(config);
 
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;

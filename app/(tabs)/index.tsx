@@ -9,6 +9,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SankofaEventLog, LogEntry } from '@/components/SankofaEventLog';
+import { DEMO_CONFIG, DEMO_FLAGS } from '@/lib/sankofaDemo';
+import {
+  getMaintenanceEnabled,
+  getSankofaSwitch,
+  getThemeColors,
+  useDemoConfig,
+  useDemoFlags,
+} from '@/lib/sankofaClient';
 
 // ─── Sankofa SDK ─────────────────────────────────────────────────────────────
 // useSankofaScreen tags this component's screen name in the native SDK.
@@ -63,6 +71,20 @@ export default function HomeScreen() {
   // 🚀 One hook call. The native SDK is now aware this is the "Home" screen.
   useSankofaScreen('Home');
 
+  const flags = useDemoFlags();
+  const config = useDemoConfig();
+  const theme = getThemeColors(config);
+  const maintenance = getMaintenanceEnabled(config);
+  const ctaVariant = flags[DEMO_FLAGS.CHECKOUT_CTA_VARIANT]?.variant ?? 'control';
+  const ctaLabel =
+    ctaVariant === 'blue' ? 'Try it free' :
+    ctaVariant === 'red'  ? 'Upgrade now' :
+    'Fire showcase event';
+  const ctaBg =
+    ctaVariant === 'blue' ? '#2563eb' :
+    ctaVariant === 'red'  ? '#dc2626' :
+    theme.primary;
+
   const [log, setLog] = useState<LogEntry[]>([]);
 
   const addLog = useCallback((entry: Omit<LogEntry, 'id' | 'timestamp'>) => {
@@ -95,6 +117,29 @@ export default function HomeScreen() {
           <Text style={styles.code}>useSankofaScreen("Home")</Text>
         </Text>
       </View>
+
+      {maintenance && (
+        <View style={styles.maintenanceBanner}>
+          <Text style={styles.maintenanceText}>
+            ⚠️ Maintenance window active — see the Lab tab for details.
+          </Text>
+        </View>
+      )}
+
+      {/* Flag-driven CTA — variant changes label + colour */}
+      <Pressable
+        onPress={() => {
+          // Reading the variant records an exposure row for experiment math.
+          getSankofaSwitch()?.getVariant(DEMO_FLAGS.CHECKOUT_CTA_VARIANT, 'control');
+          const payload = { variant: ctaVariant, config_support: config[DEMO_CONFIG.SUPPORT_URL]?.value };
+          Sankofa.track('cta_showcase_pressed', payload);
+          addLog({ type: 'track', label: 'cta_showcase_pressed', detail: JSON.stringify(payload) });
+        }}
+        style={[styles.flagCta, { backgroundColor: ctaBg }]}
+      >
+        <Text style={styles.flagCtaLabel}>{ctaLabel}</Text>
+        <Text style={styles.flagCtaTag}>variant · {ctaVariant}</Text>
+      </Pressable>
 
       {/* ── Quick event buttons ── */}
       <Text style={styles.sectionLabel}>FIRE EVENTS</Text>
@@ -235,4 +280,24 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     overflow: 'hidden',
   },
+  maintenanceBanner: {
+    marginHorizontal: 16,
+    backgroundColor: '#f59e0b1f',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  maintenanceText: { color: '#fbbf24', fontSize: 12, fontWeight: '600' },
+  flagCta: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  flagCtaLabel: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  flagCtaTag: { color: '#ffffffb3', fontSize: 10, marginTop: 4, letterSpacing: 1 },
 });
