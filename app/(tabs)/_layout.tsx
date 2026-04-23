@@ -63,6 +63,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="flask" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="crashes"
+        options={{
+          title: 'Crashes',
+          tabBarIcon: ({ color }) => <TabIcon name="bug" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

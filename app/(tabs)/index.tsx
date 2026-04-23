@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
+import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SankofaEventLog, LogEntry } from '@/components/SankofaEventLog';
 import { DEMO_CONFIG, DEMO_FLAGS } from '@/lib/sankofaDemo';
@@ -140,6 +141,20 @@ export default function HomeScreen() {
         <Text style={styles.flagCtaLabel}>{ctaLabel}</Text>
         <Text style={styles.flagCtaTag}>variant · {ctaVariant}</Text>
       </Pressable>
+
+      {/* ── Catch gallery shortcut ── */}
+      <Link href="/(tabs)/crashes" asChild>
+        <Pressable style={styles.crashShortcut}>
+          <Text style={styles.crashShortcutEmoji}>🐛</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.crashShortcutTitle}>Catch Crash Gallery</Text>
+            <Text style={styles.crashShortcutSub}>
+              Trigger realistic RN errors — see them land in the dashboard.
+            </Text>
+          </View>
+          <Text style={styles.crashShortcutChevron}>›</Text>
+        </Pressable>
+      </Link>
 
       {/* ── Quick event buttons ── */}
       <Text style={styles.sectionLabel}>FIRE EVENTS</Text>
@@ -300,4 +315,20 @@ const styles = StyleSheet.create({
   },
   flagCtaLabel: { color: '#fff', fontWeight: '800', fontSize: 15 },
   flagCtaTag: { color: '#ffffffb3', fontSize: 10, marginTop: 4, letterSpacing: 1 },
+  crashShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F8717155',
+    padding: 14,
+  },
+  crashShortcutEmoji: { fontSize: 24 },
+  crashShortcutTitle: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  crashShortcutSub: { color: '#6B7280', fontSize: 11, marginTop: 2 },
+  crashShortcutChevron: { color: '#6B7280', fontSize: 24, fontWeight: '300' },
 });

@@ -73,8 +73,8 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     try {
-      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig } = require('sankofa-react-native');
-      const { setSankofaSwitch, setSankofaConfig } = require('@/lib/sankofaClient');
+      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaCatch } = require('sankofa-react-native');
+      const { setSankofaSwitch, setSankofaConfig, setSankofaCatch } = require('@/lib/sankofaClient');
       const { DEMO_FLAG_DEFAULTS, DEMO_CONFIG_DEFAULTS } = require('@/lib/sankofaDemo');
 
       Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
@@ -94,6 +94,38 @@ export default function RootLayout() {
       const config = new SankofaConfig({ defaults: DEMO_CONFIG_DEFAULTS });
       setSankofaSwitch(switches);
       setSankofaConfig(config);
+
+      // Sankofa Catch — crash + error tracking. Constructed after
+      // initialize() so the Traffic Cop registers it before the first
+      // handshake and the global ErrorUtils / rejection hooks install
+      // immediately. Flag + config snapshots are passed through so every
+      // event carries the active experiment state at capture time.
+      const catcher = new SankofaCatch({
+        environment: 'test',
+        appVersion: '1.0.0',
+        readFlagSnapshot: () => {
+          const out: Record<string, string> = {};
+          try {
+            for (const key of Object.keys(DEMO_FLAG_DEFAULTS)) {
+              const d = switches.getDecision(key);
+              if (d?.variant) out[key] = d.variant;
+              else if (d?.value !== undefined) out[key] = String(d.value);
+            }
+          } catch {}
+          return out;
+        },
+        readConfigSnapshot: () => {
+          const out: Record<string, unknown> = {};
+          try {
+            for (const key of Object.keys(DEMO_CONFIG_DEFAULTS)) {
+              const d = config.getDecision(key);
+              if (d?.value !== undefined) out[key] = d.value;
+            }
+          } catch {}
+          return out;
+        },
+      });
+      setSankofaCatch(catcher);
 
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;
