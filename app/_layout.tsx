@@ -73,11 +73,11 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     try {
-      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaCatch } = require('sankofa-react-native');
-      const { setSankofaSwitch, setSankofaConfig, setSankofaCatch } = require('@/lib/sankofaClient');
+      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaCatch, SankofaPulse } = require('sankofa-react-native');
+      const { setSankofaSwitch, setSankofaConfig, setSankofaCatch, setSankofaPulse } = require('@/lib/sankofaClient');
       const { DEMO_FLAG_DEFAULTS, DEMO_CONFIG_DEFAULTS } = require('@/lib/sankofaDemo');
 
-      Sankofa.initialize('sk_test_b25f965d194d55bd071fb23921401e7c', {
+      Sankofa.initialize('', {
         endpoint: 'http://192.168.1.241:8080', //'http://192.168.1.81:8080',
         debug: true,
         recordSessions: true,
@@ -126,6 +126,25 @@ export default function RootLayout() {
         },
       });
       setSankofaCatch(catcher);
+
+      // Sankofa Pulse — surveys (NPS, CSAT, custom). Construct after
+      // initialize() so the bridge has the apiKey + endpoint cached.
+      // Pulse forwards Switch's flag decisions for `feature_flag`-tied
+      // targeting, so flag-gated surveys evaluate without a re-fetch.
+      const pulse = new SankofaPulse({
+        defaultFlagValues: (() => {
+          const out: Record<string, unknown> = {};
+          try {
+            for (const key of Object.keys(DEMO_FLAG_DEFAULTS)) {
+              const d = switches.getDecision(key);
+              if (d?.variant) out[key] = d.variant;
+              else if (d?.value !== undefined) out[key] = d.value;
+            }
+          } catch {}
+          return out;
+        })(),
+      });
+      setSankofaPulse(pulse);
 
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;

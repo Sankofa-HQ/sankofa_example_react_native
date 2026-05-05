@@ -70,6 +70,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabIcon name="bug" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="pulse"
+        options={{
+          title: 'Pulse',
+          tabBarIcon: ({ color }) => <TabIcon name="comments" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

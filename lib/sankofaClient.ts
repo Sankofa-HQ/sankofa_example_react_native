@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FlagDecision, ItemDecision, SankofaSwitchAPI, SankofaConfigAPI, SankofaCatchAPI } from 'sankofa-react-native';
+import type { FlagDecision, ItemDecision, SankofaSwitchAPI, SankofaConfigAPI, SankofaCatchAPI, SankofaPulse } from 'sankofa-react-native';
 
 import { DEMO_CONFIG, DEMO_CONFIG_DEFAULTS, DEMO_FLAGS, DEMO_FLAG_DEFAULTS, type PricingTier, type ThemeColors } from './sankofaDemo';
 
@@ -9,6 +9,7 @@ import { DEMO_CONFIG, DEMO_CONFIG_DEFAULTS, DEMO_FLAGS, DEMO_FLAG_DEFAULTS, type
 let switchInstance: SankofaSwitchAPI | null = null;
 let configInstance: SankofaConfigAPI | null = null;
 let catchInstance: SankofaCatchAPI | null = null;
+let pulseInstance: SankofaPulse | null = null;
 
 export function setSankofaSwitch(instance: SankofaSwitchAPI) {
   switchInstance = instance;
@@ -22,6 +23,10 @@ export function setSankofaCatch(instance: SankofaCatchAPI) {
   catchInstance = instance;
 }
 
+export function setSankofaPulse(instance: SankofaPulse) {
+  pulseInstance = instance;
+}
+
 export function getSankofaSwitch(): SankofaSwitchAPI | null {
   return switchInstance;
 }
@@ -32,6 +37,10 @@ export function getSankofaConfig(): SankofaConfigAPI | null {
 
 export function getSankofaCatch(): SankofaCatchAPI | null {
   return catchInstance;
+}
+
+export function getSankofaPulse(): SankofaPulse | null {
+  return pulseInstance;
 }
 
 // ── useDemoFlags — subscribe to every canonical flag ──────────────────
