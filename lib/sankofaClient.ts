@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FlagDecision, ItemDecision, SankofaSwitchAPI, SankofaConfigAPI, SankofaCatchAPI, SankofaPulse } from 'sankofa-react-native';
+import { SankofaCatch } from 'sankofa-react-native';
 
 import { DEMO_CONFIG, DEMO_CONFIG_DEFAULTS, DEMO_FLAGS, DEMO_FLAG_DEFAULTS, type PricingTier, type ThemeColors } from './sankofaDemo';
 
@@ -36,7 +37,12 @@ export function getSankofaConfig(): SankofaConfigAPI | null {
 }
 
 export function getSankofaCatch(): SankofaCatchAPI | null {
-  return catchInstance;
+  // 🚀 Phase A: Catch is now auto-constructed by `Sankofa.initialize`.
+  // Existing call sites that still use `getSankofaCatch()` keep
+  // working via the singleton fallback below — no migration churn
+  // needed for screens that haven't moved to the static helpers
+  // (`Sankofa.captureException`, `Sankofa.log`, etc.).
+  return catchInstance ?? SankofaCatch.instance;
 }
 
 export function getSankofaPulse(): SankofaPulse | null {

@@ -73,59 +73,46 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     try {
-      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaCatch, SankofaPulse } = require('sankofa-react-native');
-      const { setSankofaSwitch, setSankofaConfig, setSankofaCatch, setSankofaPulse } = require('@/lib/sankofaClient');
+      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaPulse } = require('sankofa-react-native');
+      const { setSankofaSwitch, setSankofaConfig, setSankofaPulse } = require('@/lib/sankofaClient');
       const { DEMO_FLAG_DEFAULTS, DEMO_CONFIG_DEFAULTS } = require('@/lib/sankofaDemo');
 
+      // 🚀 Phase A — single init, errors+crashes auto-captured.
+      //
+      // `enableCatch: true` (the default) tells both the JS and the
+      // native bridges to auto-start SankofaCatch.  That covers ALL
+      // four error surfaces from one call:
+      //
+      //   - JS uncaught errors + unhandled promise rejections (JS Catch)
+      //   - iOS NSException + POSIX-signal crashes (native iOS Catch)
+      //   - Android JVM uncaught exceptions + ANRs (native Android Catch)
+      //   - Console / fetch / XHR breadcrumbs (JS Catch autocapture)
+      //
+      // Switch + Config decisions are auto-discovered from the registry
+      // — no `readFlagSnapshot` / `readConfigSnapshot` boilerplate.
       Sankofa.initialize('', {
-        endpoint: 'http://192.168.1.241:8080', //'http://192.168.1.81:8080',
+        endpoint: 'http://192.168.1.241:8080',
         debug: true,
         recordSessions: true,
         maskAllInputs: true,
         trackLifecycleEvents: true,
+        // Catch — Crashlytics + Sentry merged.  Every option below
+        // could be omitted; defaults are sensible.
+        enableCatch: true,
+        catchEnvironment: 'test',
+        appVersion: '1.0.0',
       });
 
       // Switch + Config — constructed AFTER initialize so they land in
       // the Module Registry as "core-initialized" and the handshake
-      // routes flags/values straight into them. Bundled defaults keep
+      // routes flags/values straight into them.  Bundled defaults keep
       // getFlag/get working before the first handshake completes (e.g.
-      // offline first-launch).
+      // offline first-launch).  Catch auto-discovers them from the
+      // registry at capture time, so no closure plumbing is needed.
       const switches = new SankofaSwitch({ defaults: DEMO_FLAG_DEFAULTS });
       const config = new SankofaConfig({ defaults: DEMO_CONFIG_DEFAULTS });
       setSankofaSwitch(switches);
       setSankofaConfig(config);
-
-      // Sankofa Catch — crash + error tracking. Constructed after
-      // initialize() so the Traffic Cop registers it before the first
-      // handshake and the global ErrorUtils / rejection hooks install
-      // immediately. Flag + config snapshots are passed through so every
-      // event carries the active experiment state at capture time.
-      const catcher = new SankofaCatch({
-        environment: 'test',
-        appVersion: '1.0.0',
-        readFlagSnapshot: () => {
-          const out: Record<string, string> = {};
-          try {
-            for (const key of Object.keys(DEMO_FLAG_DEFAULTS)) {
-              const d = switches.getDecision(key);
-              if (d?.variant) out[key] = d.variant;
-              else if (d?.value !== undefined) out[key] = String(d.value);
-            }
-          } catch {}
-          return out;
-        },
-        readConfigSnapshot: () => {
-          const out: Record<string, unknown> = {};
-          try {
-            for (const key of Object.keys(DEMO_CONFIG_DEFAULTS)) {
-              const d = config.getDecision(key);
-              if (d?.value !== undefined) out[key] = d.value;
-            }
-          } catch {}
-          return out;
-        },
-      });
-      setSankofaCatch(catcher);
 
       // Sankofa Pulse — surveys (NPS, CSAT, custom). Construct after
       // initialize() so the bridge has the apiKey + endpoint cached.
