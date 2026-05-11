@@ -208,6 +208,29 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DarkTheme}>
+      {/*
+        Screen tagging in this example uses `useSankofaScreen("Name")`
+        per-screen (see app/(tabs)/crashes.tsx etc.), because Expo
+        Router owns the `NavigationContainer` and exposes route info
+        through its own hooks instead of a ref.
+
+        For non-Expo-Router apps that hold a `NavigationContainer`
+        directly, drop `useSankofaNavigationTracking(navRef)` once in
+        the app shell and skip all the per-screen hooks:
+
+          import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
+          import { useSankofaNavigationTracking } from "sankofa-react-native";
+
+          export default function App() {
+            const navRef = useNavigationContainerRef();
+            useSankofaNavigationTracking(navRef);
+            return (
+              <NavigationContainer ref={navRef}>
+                <RootStack />
+              </NavigationContainer>
+            );
+          }
+      */}
       <Stack screenOptions={{ headerStyle: { backgroundColor: '#0F0F14' }, headerTintColor: '#fff' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
