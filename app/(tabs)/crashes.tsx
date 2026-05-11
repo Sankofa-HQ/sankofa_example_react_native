@@ -10,10 +10,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getSankofaCatch } from '@/lib/sankofaClient';
 
-// Screen-tagging hook — tolerated if missing (Expo Go without native module).
+// Phase A statics + Phase B withScope land on the `Sankofa` namespace.
+// Tolerated if the package isn't available (Expo Go without the native
+// module — Phase A helpers degrade to no-ops there).
+let Sankofa: typeof import('sankofa-react-native').Sankofa | undefined;
 let useSankofaScreen: (name: string) => void = () => {};
 try {
-  useSankofaScreen = require('sankofa-react-native').useSankofaScreen;
+  const mod = require('sankofa-react-native');
+  Sankofa = mod.Sankofa;
+  useSankofaScreen = mod.useSankofaScreen;
 } catch {}
 
 // ── Theme — matches the rest of the example ──────────────────────────
@@ -301,6 +306,80 @@ function buildScenarios(): Scenario[] {
             },
           });
         }
+      },
+    },
+
+    // ── Phase B: withScope ────────────────────────────────────────────
+    {
+      id: 'phase-b-with-scope',
+      title: 'withScope — temporary scope overlay',
+      description:
+        'tags + level + extras attached to ONE capture only; the global scope is untouched.',
+      tone: 'info',
+      run: () => {
+        if (!Sankofa) return;
+        Sankofa.withScope((scope) => {
+          scope.setTag('checkout_step', 'payment');
+          scope.setTag('payment_method', 'stripe');
+          scope.setExtra('cart_id', 'cart_8x92Lq');
+          scope.setExtra('cart_value_cents', 4900);
+          scope.setLevel('warning');
+          scope.setFingerprint(['checkout', 'payment', 'manual']);
+          try {
+            throw new Error('payment gateway timeout — retried 3x');
+          } catch (e) {
+            // Only this capture carries the scope's extras + level.
+            Sankofa!.captureException(e);
+          }
+        });
+        // Subsequent captures lose the scope.
+        Sankofa.captureMessage('post-scope event — no checkout_step tag');
+      },
+    },
+    {
+      id: 'phase-b-with-scope-nested',
+      title: 'withScope — nested scopes',
+      description:
+        'inner scope inherits + extends the outer scope at capture time',
+      tone: 'info',
+      run: () => {
+        if (!Sankofa) return;
+        Sankofa.withScope((outer) => {
+          outer.setTag('feature', 'billing');
+          outer.setExtra('checkout_session', 'sess_12345');
+          Sankofa!.withScope((inner) => {
+            inner.setTag('substep', 'card-validation');
+            inner.setExtra('attempt', 2);
+            try {
+              throw new TypeError('invalid card number checksum');
+            } catch (e) {
+              // This event carries BOTH feature=billing (outer) AND
+              // substep=card-validation (inner).
+              Sankofa!.captureException(e);
+            }
+          });
+          Sankofa!.captureMessage('still in outer scope (no substep tag)');
+        });
+      },
+    },
+    {
+      id: 'phase-b-before-send-info',
+      title: 'beforeSend — see app/_layout.tsx',
+      description:
+        'beforeSend is wired at Sankofa.initialize time; this scenario fires an event the hook can scrub or drop',
+      tone: 'info',
+      run: () => {
+        if (!Sankofa) return;
+        Sankofa.captureMessage(
+          'sensitive event — beforeSend should scrub user_email',
+          {
+            level: 'info',
+            extra: {
+              user_email: 'ada@example.com',
+              note: 'beforeSend hook can strip user_email here',
+            },
+          },
+        );
       },
     },
   ];

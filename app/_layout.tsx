@@ -101,6 +101,25 @@ export default function RootLayout() {
         enableCatch: true,
         catchEnvironment: 'test',
         appVersion: '1.0.0',
+        // 🚀 Phase B — beforeSend hook. Runs AFTER an event is composed
+        // but BEFORE it's sent. Return null to drop entirely; return
+        // the event (possibly modified) to ship. Throws swallowed.
+        // Demo behaviours:
+        //   1. Drop events whose message contains "[noise]" — useful
+        //      for filtering framework warnings you can't fix.
+        //   2. Scrub `user_email` from `extra` so PII doesn't leak.
+        // Only applies to the JS-side capture path; native NSException
+        // + JVM crashes are composed by the native SDKs.
+        beforeSend: (event: import('sankofa-react-native').CatchEvent) => {
+          if (event.message?.includes('[noise]')) return null;
+          if (event.extra && 'user_email' in event.extra) {
+            return {
+              ...event,
+              extra: { ...event.extra, user_email: '[redacted]' },
+            };
+          }
+          return event;
+        },
       });
 
       // Switch + Config — constructed AFTER initialize so they land in
