@@ -3,9 +3,12 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import 'react-native-reanimated';
+
+import { Connect } from '@/components/Connect';
+import { sankofaConnection } from '@/lib/sankofaConnection';
 
 import { ErrorBoundary as ExpoErrorBoundary, ErrorBoundaryProps } from 'expo-router';
 
@@ -51,6 +54,22 @@ export default function RootLayout() {
   const [updateState, setUpdateState] = useState<UpdateUIState>({ kind: 'idle' });
   const deployRef = useRef<any>(null);
 
+  // Subscribe to the connection store. Re-renders when the user
+  // connects / disconnects so the layout swaps between the connect
+  // screen and the tab stack.
+  const connection = useSyncExternalStore(
+    sankofaConnection.subscribe,
+    sankofaConnection.getSnapshot,
+    sankofaConnection.getSnapshot,
+  );
+
+  // Bootstrap: hydrate persisted creds on first mount. If creds exist
+  // the store auto-initialises the native SDK, otherwise the connect
+  // screen renders below until the user submits.
+  useEffect(() => {
+    void sankofaConnection.hydrate();
+  }, []);
+
   // Font load failures are non-fatal. After an OTA update, Metro's asset
   // entries for a font can drift from what's physically in the .app, making
   // `expo-font.loadAsync` fail with CTFontManagerError 101. Crashing the
@@ -70,87 +89,18 @@ export default function RootLayout() {
     if (loaded || error) SplashScreen.hideAsync();
   }, [loaded, error]);
 
+  // Deploy (OTA updates) only spins up once the user has connected and
+  // the native Sankofa SDK is initialised — Deploy reports update
+  // outcomes through the SDK transport and races into a noisy retry
+  // loop if it boots before the SDK has an api-key resolved. The core
+  // SDK + Switch / Config / Pulse init now lives in
+  // `sankofaConnection.initialiseSDK` so the connect screen drives the
+  // bootstrap order across iOS, Android, and Expo Go.
   useEffect(() => {
+    if (!connection.isConnected) return;
     let cancelled = false;
     try {
-      const { Sankofa, SankofaDeploy, SankofaSwitch, SankofaConfig, SankofaPulse } = require('sankofa-react-native');
-      const { setSankofaSwitch, setSankofaConfig, setSankofaPulse } = require('@/lib/sankofaClient');
-      const { DEMO_FLAG_DEFAULTS, DEMO_CONFIG_DEFAULTS } = require('@/lib/sankofaDemo');
-
-      // 🚀 Phase A — single init, errors+crashes auto-captured.
-      //
-      // `enableCatch: true` (the default) tells both the JS and the
-      // native bridges to auto-start SankofaCatch.  That covers ALL
-      // four error surfaces from one call:
-      //
-      //   - JS uncaught errors + unhandled promise rejections (JS Catch)
-      //   - iOS NSException + POSIX-signal crashes (native iOS Catch)
-      //   - Android JVM uncaught exceptions + ANRs (native Android Catch)
-      //   - Console / fetch / XHR breadcrumbs (JS Catch autocapture)
-      //
-      // Switch + Config decisions are auto-discovered from the registry
-      // — no `readFlagSnapshot` / `readConfigSnapshot` boilerplate.
-      Sankofa.initialize('', {
-        endpoint: 'http://192.168.1.241:8080',
-        debug: true,
-        recordSessions: true,
-        maskAllInputs: true,
-        trackLifecycleEvents: true,
-        // Catch — Crashlytics + Sentry merged.  Every option below
-        // could be omitted; defaults are sensible.
-        enableCatch: true,
-        catchEnvironment: 'test',
-        appVersion: '1.0.0',
-        // 🚀 Phase B — beforeSend hook. Runs AFTER an event is composed
-        // but BEFORE it's sent. Return null to drop entirely; return
-        // the event (possibly modified) to ship. Throws swallowed.
-        // Demo behaviours:
-        //   1. Drop events whose message contains "[noise]" — useful
-        //      for filtering framework warnings you can't fix.
-        //   2. Scrub `user_email` from `extra` so PII doesn't leak.
-        // Only applies to the JS-side capture path; native NSException
-        // + JVM crashes are composed by the native SDKs.
-        beforeSend: (event: import('sankofa-react-native').CatchEvent) => {
-          if (event.message?.includes('[noise]')) return null;
-          if (event.extra && 'user_email' in event.extra) {
-            return {
-              ...event,
-              extra: { ...event.extra, user_email: '[redacted]' },
-            };
-          }
-          return event;
-        },
-      });
-
-      // Switch + Config — constructed AFTER initialize so they land in
-      // the Module Registry as "core-initialized" and the handshake
-      // routes flags/values straight into them.  Bundled defaults keep
-      // getFlag/get working before the first handshake completes (e.g.
-      // offline first-launch).  Catch auto-discovers them from the
-      // registry at capture time, so no closure plumbing is needed.
-      const switches = new SankofaSwitch({ defaults: DEMO_FLAG_DEFAULTS });
-      const config = new SankofaConfig({ defaults: DEMO_CONFIG_DEFAULTS });
-      setSankofaSwitch(switches);
-      setSankofaConfig(config);
-
-      // Sankofa Pulse — surveys (NPS, CSAT, custom). Construct after
-      // initialize() so the bridge has the apiKey + endpoint cached.
-      // Pulse forwards Switch's flag decisions for `feature_flag`-tied
-      // targeting, so flag-gated surveys evaluate without a re-fetch.
-      const pulse = new SankofaPulse({
-        defaultFlagValues: (() => {
-          const out: Record<string, unknown> = {};
-          try {
-            for (const key of Object.keys(DEMO_FLAG_DEFAULTS)) {
-              const d = switches.getDecision(key);
-              if (d?.variant) out[key] = d.variant;
-              else if (d?.value !== undefined) out[key] = d.value;
-            }
-          } catch {}
-          return out;
-        })(),
-      });
-      setSankofaPulse(pulse);
+      const { SankofaDeploy } = require('sankofa-react-native');
 
       const deploy = new SankofaDeploy({ checkOnResume: true });
       deployRef.current = deploy;
@@ -200,11 +150,25 @@ export default function RootLayout() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [connection.isConnected]);
 
   // Wait for either a successful font load OR a load failure — don't block
   // the UI forever if the font can't register.
   if (!loaded && !error) return null;
+
+  // First-run gate. Render the connect form until the user provides an
+  // API key + endpoint. Once they do, `sankofaConnection.connect`
+  // persists the creds (AsyncStorage) and initialises the native SDK;
+  // the store's `isConnected` flip causes this layout to re-render
+  // with the full tab stack. Returning users skip this entirely —
+  // `hydrate()` auto-initialises from the saved creds on mount.
+  if (connection.isHydrated && !connection.isConnected) {
+    return (
+      <ThemeProvider value={DarkTheme}>
+        <Connect initialEndpoint={connection.endpoint} />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider value={DarkTheme}>

@@ -225,8 +225,28 @@ export default function LabScreen() {
         })}
 
         <RefreshRow />
+        <DisconnectRow />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function DisconnectRow() {
+  return (
+    <View style={{ marginTop: 12, alignItems: 'center' }}>
+      <Pressable
+        onPress={() => {
+          // Wipe persisted creds and flip the connection store to
+          // "not connected". The root layout re-renders and the
+          // user lands back on the connect screen — matches the iOS
+          // / Android / web examples' Disconnect UX.
+          void require('@/lib/sankofaConnection').sankofaConnection.disconnect();
+        }}
+        style={styles.disconnectBtn}
+      >
+        <Text style={styles.disconnectText}>Disconnect & forget API key</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -371,4 +391,14 @@ const styles = StyleSheet.create({
   },
   refreshText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   refreshNote: { color: MUTED, fontSize: 10, marginTop: 4 },
+
+  disconnectBtn: {
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F87171',
+  },
+  disconnectText: { color: '#F87171', fontSize: 12, fontWeight: '700' },
 });
